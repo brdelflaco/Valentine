@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Valentine</title>
+
+  <style>
+    :root{
+      --bg1:#ffd6e0;
+      --bg2:#ffb3c1;
+      --yes:#ff4d6d;
+      --text:#3a1b1f;
+    }
+
+    body{
+      margin:0;
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      background: linear-gradient(180deg, var(--bg1), var(--bg2));
+      font-family: Arial, sans-serif;
+      color: var(--text);
+      text-align:center;
+      overflow:hidden; /* confettis */
+    }
+
+    .card{
+      width:min(620px, 92vw);
+      background: rgba(255,255,255,0.62);
+      backdrop-filter: blur(6px);
+      border-radius: 18px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.14);
+      padding: 28px 18px 22px;
+    }
+
+    h1{
+      margin: 0 0 10px;
+      font-size: clamp(22px, 3.6vw, 34px);
+    }
+
+    #status{
+      margin: 0 0 14px;
+      opacity: 0.9;
+    }
+
+    /* zone où "Non" peut se déplacer */
+    .playground{
+      position: relative;
+      width: 100%;
+      height: 240px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+    }
+
+    /* rangée initiale des boutons */
+    .btn-row{
+      display:flex;
+      gap: 16px;
+      align-items:center;
+      justify-content:center;
+      position: relative;
+      transform: translateX(0px); /* décale l’ensemble vers la gauche -> Oui plus à gauche */
+    }
+
+    button, .placeholder{
+      width: 160px;   /* mêmes dimensions */
+      height: 56px;   /* mêmes dimensions */
+      font-size: 18px;
+      border: none;
+      border-radius: 12px;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button{
+      cursor: pointer;
+      box-shadow: 0 10px 18px rgba(0,0,0,0.10);
+      transition: transform 160ms ease, box-shadow 160ms ease;
+      background: #fff;
+      color:#333;
+    }
+
+    #yesBtn{
+      background: var(--yes);
+      color: #fff;
+      transform-origin: center;
+    }
+
+    #noBtn{
+      background: #fff;
+      color: #333;
+      position: static; /* IMPORTANT: au départ il reste dans la rangée */
+      touch-action: manipulation;
+    }
+
+    .placeholder{
+      display:inline-block;   /* garde l’espace de “Non” */
+      background: transparent;
+    }
+
+    /* écran résultat */
+    #result{
+      display:none;
+      animation: fadeIn 450ms ease;
+    }
+
+    video{
+      width:min(520px, 92vw);
+      border-radius: 16px;
+      box-shadow: 0 12px 26px rgba(0,0,0,0.18);
+      display:block;
+      margin: 12px auto 0;
+    }
+
+    @keyframes fadeIn{
+      from{ opacity:0; transform: translateY(6px); }
+      to{ opacity:1; transform: translateY(0); }
+    }
+
+    /* Confettis */
+    .confetti{
+      position: fixed;
+      top: -12px;
+      border-radius: 2px;
+      pointer-events:none;
+      animation-name: fall;
+      animation-timing-function: linear;
+      animation-fill-mode: forwards;
+    }
+
+    @keyframes fall{
+      to{
+        transform: translateY(110vh) rotate(720deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- QUESTION -->
+  <div class="card" id="questionCard">
+    <h1>Veux-tu être ma valentine ? :) </h1>
+    <p id="status">Tu es libre de ton choix, mais réfléchis bien...</p>
+
+    <div class="playground" id="playground">
+      <div class="btn-row" id="btnRow">
+        <button id="yesBtn">Oui</button>
+        <button id="noBtn">Non</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTAT -->
+  <div class="card" id="result">
+    <h1>Bon choix ahah </h1>
+    <p>A samedi &lt;3</p>
+    <video autoplay loop muted playsinline>
+      <source src="fireworks.mp4" type="video/mp4" />
+    </video>
+  </div>
+
+  <script>
+    const playground   = document.getElementById("playground");
+    const btnRow       = document.getElementById("btnRow");
+    const yesBtn       = document.getElementById("yesBtn");
+    const noBtn        = document.getElementById("noBtn");
+    const status       = document.getElementById("status");
+    const questionCard = document.getElementById("questionCard");
+    const result       = document.getElementById("result");
+
+    let attempts = 0;
+    let yesScale = 1;
+
+    // Accélération: on réduit un cooldown entre deux fuites
+    let lastMoveAt = 0;
+    let cooldownMs = 260;     // départ
+    const minCooldown = 70;   // limite
+
+    function updateStatus() {
+      const lines = [
+        "Tu es libre de ton choix, mais réfléchis bien...",
+        "Tu as vraiment essayé de cliquer sur Non ?",
+        "Arrête, je vais me vexer",
+        "C'est peine perdue",
+        "Allez… abandonne et clique sur Oui"
+      ];
+
+      const idx = Math.min(lines.length - 1,Math.floor(attempts / 3));
+      status.textContent = lines[idx];
+
+    }
+
+
+    // Met "Non" en absolute MAIS garde la place dans la rangée (placeholder)
+    function armNoButton() {
+      // 1) placeholder pour empêcher "Oui" de se recentrer
+      const ph = document.createElement("span");
+      ph.className = "placeholder";
+      ph.id = "noPlaceholder";
+      btnRow.replaceChild(ph, noBtn);
+
+      // 2) récupère la position de "Non" (avant de bouger) et le met dans le playground
+      // (on calcule à partir du placeholder, qui est exactement au même endroit)
+      const pRect = playground.getBoundingClientRect();
+      const phRect = ph.getBoundingClientRect();
+
+      const left = phRect.left - pRect.left;
+      const top  = phRect.top  - pRect.top;
+
+      playground.appendChild(noBtn);
+      noBtn.style.position = "absolute";
+      noBtn.style.left = left + "px";
+      noBtn.style.top  = top + "px";
+    }
+
+    function moveNoRandom() {
+      const rect = playground.getBoundingClientRect();
+      const bw = noBtn.offsetWidth;
+      const bh = noBtn.offsetHeight;
+
+      const maxX = Math.max(0, rect.width - bw);
+      const maxY = Math.max(0, rect.height - bh);
+
+      const x = Math.random() * maxX;
+      const y = Math.random() * maxY;
+
+      noBtn.style.left = x + "px";
+      noBtn.style.top  = y + "px";
+    }
+
+    function growYes() {
+      yesScale = Math.min(2.35, yesScale + 0.12);
+      yesBtn.style.transform = `scale(${yesScale})`;
+      yesBtn.style.boxShadow = "0 14px 24px rgba(0,0,0,0.14)";
+    }
+
+    function speedUpNo() {
+      cooldownMs = Math.max(minCooldown, cooldownMs - 18);
+    }
+
+    function escapeNo() {
+      const now = performance.now();
+      if (now - lastMoveAt < cooldownMs) return;
+      lastMoveAt = now;
+
+      attempts++;
+      moveNoRandom();
+      growYes();
+      speedUpNo();
+      updateStatus();
+    }
+
+    // Confettis
+    function confettiBurst(durationMs = 1100, perFrame = 10) {
+      const start = performance.now();
+
+      function spawnOne() {
+        const c = document.createElement("div");
+        c.className = "confetti";
+        c.style.left = (Math.random() * 100) + "vw";
+
+        const w = 6 + Math.random() * 8;
+        const h = 8 + Math.random() * 10;
+        c.style.width = w + "px";
+        c.style.height = h + "px";
+
+        const hue = Math.floor(Math.random() * 360);
+        c.style.background = `hsl(${hue} 90% 60%)`;
+
+        const dur = 700 + Math.random() * 900;
+        c.style.animationDuration = dur + "ms";
+
+        document.body.appendChild(c);
+        setTimeout(() => c.remove(), dur + 100);
+      }
+
+      function loop(t) {
+        for (let i = 0; i < perFrame; i++) spawnOne();
+        if (t - start < durationMs) requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    }
+
+    yesBtn.addEventListener("click", () => {
+      confettiBurst(1100, 10);
+      questionCard.style.display = "none";
+      result.style.display = "block";
+    });
+
+    // Desktop + mobile
+    noBtn.addEventListener("mouseenter", escapeNo);
+    noBtn.addEventListener("touchstart", (e) => { e.preventDefault(); escapeNo(); }, { passive: false });
+    noBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); escapeNo(); });
+
+    window.addEventListener("load", () => {
+      updateStatus();
+      // On “arme” Non après le rendu pour conserver l'état initial côte à côte
+      setTimeout(armNoButton, 60);
+    });
+
+    window.addEventListener("resize", () => {
+      if (noBtn.style.position === "absolute") {
+        moveNoRandom();
+      }
+    });
+  </script>
+</body>
+</html>
