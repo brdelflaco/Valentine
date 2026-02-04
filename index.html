@@ -44,7 +44,6 @@
       opacity: 0.9;
     }
 
-    /* zone où "Non" peut se déplacer */
     .playground{
       position: relative;
       width: 100%;
@@ -54,19 +53,18 @@
       place-items: center;
     }
 
-    /* rangée initiale des boutons */
     .btn-row{
       display:flex;
       gap: 16px;
       align-items:center;
       justify-content:center;
       position: relative;
-      transform: translateX(0px); /* décale l’ensemble vers la gauche -> Oui plus à gauche */
+      transform: translateX(0px);
     }
 
     button, .placeholder{
-      width: 160px;   /* mêmes dimensions */
-      height: 56px;   /* mêmes dimensions */
+      width: 160px;
+      height: 56px;
       font-size: 18px;
       border: none;
       border-radius: 12px;
@@ -91,12 +89,12 @@
     #noBtn{
       background: #fff;
       color: #333;
-      position: static; /* IMPORTANT: au départ il reste dans la rangée */
+      position: static;
       touch-action: manipulation;
     }
 
     .placeholder{
-      display:inline-block;   /* garde l’espace de “Non” */
+      display:inline-block;
       background: transparent;
     }
 
@@ -119,7 +117,6 @@
       to{ opacity:1; transform: translateY(0); }
     }
 
-    /* Confettis */
     .confetti{
       position: fixed;
       top: -12px;
@@ -173,7 +170,6 @@
     let attempts = 0;
     let yesScale = 1;
 
-    // Accélération: on réduit un cooldown entre deux fuites
     let lastMoveAt = 0;
     let cooldownMs = 260;     // départ
     const minCooldown = 70;   // limite
@@ -192,8 +188,6 @@
 
     }
 
-
-    // Met "Non" en absolute MAIS garde la place dans la rangée (placeholder)
     function armNoButton() {
       // 1) placeholder pour empêcher "Oui" de se recentrer
       const ph = document.createElement("span");
@@ -201,8 +195,6 @@
       ph.id = "noPlaceholder";
       btnRow.replaceChild(ph, noBtn);
 
-      // 2) récupère la position de "Non" (avant de bouger) et le met dans le playground
-      // (on calcule à partir du placeholder, qui est exactement au même endroit)
       const pRect = playground.getBoundingClientRect();
       const phRect = ph.getBoundingClientRect();
 
@@ -252,7 +244,6 @@
       updateStatus();
     }
 
-    // Confettis
     function confettiBurst(durationMs = 1100, perFrame = 10) {
       const start = performance.now();
 
@@ -289,14 +280,12 @@
       result.style.display = "block";
     });
 
-    // Desktop + mobile
     noBtn.addEventListener("mouseenter", escapeNo);
     noBtn.addEventListener("touchstart", (e) => { e.preventDefault(); escapeNo(); }, { passive: false });
     noBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); escapeNo(); });
 
     window.addEventListener("load", () => {
       updateStatus();
-      // On “arme” Non après le rendu pour conserver l'état initial côte à côte
       setTimeout(armNoButton, 60);
     });
 
@@ -308,3 +297,4 @@
   </script>
 </body>
 </html>
+
